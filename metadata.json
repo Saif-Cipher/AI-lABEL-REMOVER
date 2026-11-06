@@ -1,0 +1,6 @@
+{
+  "name": "Remove AI Label - Neofuturistic AI Metadata Stripper",
+  "description": "Strip C2PA manifests, XMP packets, EXIF tags, and AI provenance metadata with high-contrast neon gradients, kinetic typography, and 100% offline client-side processing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

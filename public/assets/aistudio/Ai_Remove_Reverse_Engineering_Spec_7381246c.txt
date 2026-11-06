@@ -1,0 +1,643 @@
+================================================================================
+REVERSE ENGINEERING SPECIFICATION & AI AGENT IMPLEMENTATION GUIDE
+TARGET APPLICATION: [Remove AI Label](https://tahmidx.tech/ai-remove/)
+SOURCE URL: https://tahmidx.tech/ai-remove/
+METHODOLOGY: Reverse Engineer Anything (REA) Runtime & DOM Observation
+================================================================================
+
+1. EXECUTIVE OVERVIEW & APPLICATION PURPOSE
+--------------------------------------------------------------------------------
+Observed Target: [Remove AI Label](https://tahmidx.tech/ai-remove/) is a 100% client-side, single-page web utility designed to strip embedded AI provenance and camera/editing metadata from digital images directly inside the user's browser.
+Observed Purpose: By drawing uploaded images onto an in-memory HTML5 Canvas and re-encoding the raw pixel buffer via canvas.toDataURL(file.type, 1.0), the application strips C2PA manifests, XMP packets, EXIF tags, and PNG text/ancillary chunks so automated social media metadata parsers (such as Instagram and Facebook AI labels) no longer flag the image via metadata inspection.
+Observed Architecture: Pure static frontend (Vanilla HTML5, CSS3 with Material Design 3 custom properties, and ES6+ JavaScript) with zero backend API endpoints for image processing. Multi-file batch downloads are packaged client-side using [JSZip 3.10.1](https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js) loaded from the Cloudflare CDN.
+
+
+2. REA FINDING LEDGER (OBSERVATIONS, INFERENCES, AND UNKNOWNS)
+--------------------------------------------------------------------------------
+Per the Reverse Engineer Anything (REA) methodology, every technical finding is categorized below by Evidence ID, Evidence Type, Confidence, Search Boundary, and Remaining Unknowns:
+
+[EVIDENCE-01] Page Metadata, Copy, and Feature Claims
+  - Evidence Type: Direct Runtime DOM Observation ([Remove AI Label](https://tahmidx.tech/ai-remove/))
+  - Confidence: High (Observed verbatim in live DOM)
+  - Observed Facts:
+      * Document Title: "Remove AI Label"
+      * Meta Charset: UTF-8
+      * Meta Viewport: width=device-width, initial-scale=1.0
+      * H1 Heading: "Remove AI Label Instantly" (with "Instantly" wrapped in a &lt;span&gt; styled with a linear gradient)
+      * Subtitle: "Strip C2PA, XMP, EXIF, and PNG metadata entirely within your browser."
+      * Dropzone Title: "Click or drag images here"
+      * Dropzone Subtitle: "JPG, PNG, WebP · Multiple files allowed"
+      * Feature Chips (4 items): "✓ Strips C2PA", "✓ Strips XMP", "✓ Strips EXIF", "👁‍🗨 Bypasses IG/FB AI Label"
+      * Privacy Note: "🔒 100% Offline Processing. Your files never leave your device."
+  - Search Boundary: Live document markup at [Remove AI Label](https://tahmidx.tech/ai-remove/).
+
+[EVIDENCE-02] Styling, Typography, and Material 3 Design Tokens
+  - Evidence Type: Direct Runtime Stylesheet Inspection ([Remove AI Label](https://tahmidx.tech/ai-remove/))
+  - Confidence: High (Observed verbatim in &lt;style&gt; and &lt;link&gt; tags)
+  - Observed Facts:
+      * Typography loaded from [Google Fonts](https://fonts.googleapis.com): Family 'Outfit' (sans-serif).
+      * Material Design 3 (:root) CSS Custom Properties:
+          --md-sys-color-background: #141218
+          --md-sys-color-on-background: #E6E0E9
+          --md-sys-color-surface: #1D1B20
+          --md-sys-color-surface-container: #211F26
+          --md-sys-color-surface-container-high: #2B2930
+          --md-sys-color-surface-container-highest: #36343B
+          --md-sys-color-primary: #D0BCFF
+          --md-sys-color-on-primary: #381E72
+          --md-sys-color-primary-container: #4F378B
+          --md-sys-color-on-primary-container: #EADDFF
+          --md-sys-color-secondary: #CCC2DC
+          --md-sys-color-on-secondary: #332D41
+          --md-sys-color-secondary-container: #4A4458
+          --md-sys-color-on-secondary-container: #E8DEF8
+          --md-sys-color-outline: #938F99
+          --md-sys-color-outline-variant: #49454F
+          --md-sys-shape-corner-medium: 16px
+          --md-sys-shape-corner-extra-large: 28px
+          --md-sys-shape-corner-full: 9999px
+          --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1)
+          --md-sys-motion-duration-medium: 400ms
+  - Search Boundary: Inline &lt;style&gt; block and external font links on [Remove AI Label](https://tahmidx.tech/ai-remove/).
+
+[EVIDENCE-03] Client-Side Sanitization Pipeline & External Dependencies
+  - Evidence Type: Direct Runtime Script Inspection ([Remove AI Label](https://tahmidx.tech/ai-remove/))
+  - Confidence: High (Observed verbatim in inline &lt;script&gt; and external script tags)
+  - Observed Facts:
+      * External Library: [JSZip 3.10.1](https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js) for bundling multiple cleaned images into a single ZIP file ("cleaned_images.zip").
+      * Analytics Scripts Observed on Target: Google Analytics (gtag.js with ID G-RG8MLZ901N) and Cloudflare Web Analytics (beacon.min.js).
+      * Core Functions: processFiles(files), processSingleFile(file, zipInstance), and resetUI(originalText).
+      * Sanitization Mechanism: FileReader.readAsDataURL(file) loads the image into an HTMLImageElement; an offscreen &lt;canvas&gt; is sized to img.width x img.height; ctx.drawImage(img, 0, 0) renders raw pixels; canvas.toDataURL(file.type, 1.0) re-encodes the image without metadata.
+  - Inferences vs. Observed Behavior:
+      * Observed: Re-encoding via HTML5 Canvas strips file-level container metadata (C2PA jumbf boxes, EXIF APP1 segments, XMP packets, PNG tEXt/iTXt/zTXt chunks).
+      * Inference / Technical Limitation: Canvas redrawing does NOT remove invisible pixel-level steganographic watermarks (such as Google SynthID) or visible corner watermarks, because pixel values are copied directly via ctx.drawImage(img, 0, 0). Furthermore, because EXIF orientation tags are stripped, browsers that auto-orient images during Image decoding before drawing to canvas preserve visual orientation, whereas ICC color profiles outside standard sRGB may be normalized to sRGB by the browser's 2D canvas context.
+  - Remaining Unknowns:
+      * Server-side HTTP headers or deployment hosting configuration on [Remove AI Label](https://tahmidx.tech/ai-remove/) beyond Cloudflare edge delivery are outside client-side functional requirements and are not needed to build the application.
+
+
+3. OBSERVED DOM STRUCTURE & ELEMENT INVENTORY
+--------------------------------------------------------------------------------
+The HTML body of [Remove AI Label](https://tahmidx.tech/ai-remove/) consists of the following semantic hierarchy and exact element IDs/classes:
+
+  &lt;main class=&quot;m3-container&quot;&gt;
+    &lt;header class=&quot;m3-header&quot;&gt;
+      &lt;h1&gt;Remove AI Label &lt;span&gt;Instantly&lt;/span&gt;&lt;/h1&gt;
+      &lt;p&gt;Strip C2PA, XMP, EXIF, and PNG metadata entirely within your browser.&lt;/p&gt;
+    &lt;/header&gt;
+
+    <section class="m3-card">
+      <div class="drop-zone" id="drop-zone">
+        <!-- Upload icon SVG / visual indicator -->
+        <div class="drop-zone-title">Click or drag images here</div>
+        <div class="drop-zone-subtitle">JPG, PNG, WebP · Multiple files allowed</div>
+        <input type="file" id="file-input" accept="image/jpeg, image/png, image/webp" multiple style="display: none;">
+      </div>
+
+      <div id="preview-container">
+        <img id="preview" alt="Image Preview">
+        <div id="file-count-text"></div>
+        <button id="download-btn" class="m3-btn">
+          <span id="download-text">Download Clean Image</span>
+        </button>
+      </div>
+
+      <div class="m3-chips">
+        <div class="m3-chip">✓ Strips C2PA</div>
+        <div class="m3-chip">✓ Strips XMP</div>
+        <div class="m3-chip">✓ Strips EXIF</div>
+        <div class="m3-chip">👁‍🗨 Bypasses IG/FB AI Label</div>
+      </div>
+    </section>
+
+    <div class="privacy-note">
+      🔒 100% Offline Processing. Your files never leave your device.
+    </div>
+  &lt;/main&gt;
+
+
+4. EXACT CSS SPECIFICATION & VISUAL STYLING RULES
+--------------------------------------------------------------------------------
+When building the replica of [Remove AI Label](https://tahmidx.tech/ai-remove/), the AI Agent should implement these exact observed CSS rules:
+
+  1. Global & Body Layout:
+     - Font family: 'Outfit', sans-serif (loaded from [Google Fonts](https://fonts.googleapis.com)).
+     - Background color: var(--md-sys-color-background) (#141218).
+     - Text color: var(--md-sys-color-on-background) (#E6E0E9).
+     - Minimum height: 100vh, display: flex, flex-direction: column, align-items: center, justify-content: center, margin: 0, padding: 24px, box-sizing: border-box.
+
+  2. Main Container (.m3-container):
+     - Width: 100%, max-width: 540px, text-align: center.
+
+  3. Header (.m3-header):
+     - Margin-bottom: 32px.
+     - .m3-header h1: font-size: 2.5rem (responsive down to 2rem on mobile), font-weight: 700, margin: 0 0 12px 0, letter-spacing: -0.02em.
+     - .m3-header h1 span: background: linear-gradient(135deg, #D0BCFF, #FFD8E4); -webkit-background-clip: text; -webkit-text-fill-color: transparent.
+     - .m3-header p: color: #CCC2DC (var(--md-sys-color-secondary)), font-size: 1.05rem, margin: 0, line-height: 1.5.
+
+  4. Primary Card (.m3-card):
+     - Background: var(--md-sys-color-surface-container) (#211F26).
+     - Border: 1px solid var(--md-sys-color-outline-variant) (#49454F).
+     - Border-radius: var(--md-sys-shape-corner-extra-large) (28px).
+     - Padding: 32px (or 24px on mobile).
+     - Box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3).
+
+  5. Interactive Dropzone (.drop-zone):
+     - Background: var(--md-sys-color-surface) (#1D1B20).
+     - Border: 2px dashed var(--md-sys-color-outline) (#938F99).
+     - Border-radius: var(--md-sys-shape-corner-medium) (16px).
+     - Padding: 48px 24px.
+     - Cursor: pointer.
+     - Transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized) (400ms cubic-bezier(0.2, 0, 0, 1)).
+     - Hover & Dragover State (.drop-zone:hover, .drop-zone.dragover):
+         * Border-color: var(--md-sys-color-primary) (#D0BCFF).
+         * Background: var(--md-sys-color-surface-container-high) (#2B2930).
+         * Transform: scale(1.01).
+     - .drop-zone-title: font-size: 1.25rem, font-weight: 600, margin-bottom: 8px, color: var(--md-sys-color-on-background) (#E6E0E9).
+     - .drop-zone-subtitle: font-size: 0.9rem, color: var(--md-sys-color-outline) (#938F99).
+
+  6. Preview & Result Section (#preview-container):
+     - Hidden by default (display: none); shown (display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 24px) once processing completes.
+     - #preview: max-width: 100%, max-height: 280px, object-fit: contain, border-radius: var(--md-sys-shape-corner-medium) (16px), box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4).
+     - #file-count-text: font-size: 0.95rem, color: var(--md-sys-color-secondary) (#CCC2DC).
+
+  7. Primary Download Button (.m3-btn):
+     - Background: var(--md-sys-color-primary) (#D0BCFF).
+     - Color: var(--md-sys-color-on-primary) (#381E72).
+     - Border: none.
+     - Border-radius: var(--md-sys-shape-corner-full) (9999px).
+     - Padding: 14px 28px.
+     - Font-family: inherit, font-size: 1rem, font-weight: 600.
+     - Cursor: pointer.
+     - Display: inline-flex, align-items: center, justify-content: center, gap: 8px.
+     - Box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2).
+     - Transition: all 200ms ease.
+     - Hover State (.m3-btn:hover):
+         * Background: #EADDFF.
+         * Box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3).
+         * Transform: translateY(-2px).
+
+  8. Feature Badges (.m3-chips & .m3-chip):
+     - .m3-chips: display: flex, flex-wrap: wrap, gap: 8px, justify-content: center, margin-top: 24px.
+     - .m3-chip: background: var(--md-sys-color-secondary-container) (#4A4458), color: var(--md-sys-color-on-secondary-container) (#E8DEF8), border-radius: 8px, padding: 6px 12px, font-size: 0.85rem, font-weight: 500.
+
+  9. Footer Privacy Note (.privacy-note):
+     - Margin-top: 24px, font-size: 0.85rem, color: var(--md-sys-color-outline) (#938F99).
+
+
+5. JAVASCRIPT STATE MACHINE & CORE LOGIC SPECIFICATION
+--------------------------------------------------------------------------------
+Below is the complete behavioral specification observed on [Remove AI Label](https://tahmidx.tech/ai-remove/) for the JavaScript implementation:
+
+  A. State Variables:
+     - currentZip = null: Holds the active [JSZip 3.10.1](https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js) instance when processing multiple images.
+     - singleImageData = null: Holds { dataUrl, name } when processing a single image.
+
+  B. Event Listeners:
+     1. dropZone 'click' -> Invokes fileInput.click().
+     2. dropZone 'dragover' -> Calls e.preventDefault() and adds class 'dragover' to dropZone.
+     3. dropZone 'dragleave' -> Removes class 'dragover' from dropZone.
+     4. dropZone 'drop' -> Calls e.preventDefault(), removes class 'dragover', and passes e.dataTransfer.files to processFiles(files).
+     5. fileInput 'change' -> Passes e.target.files to processFiles(files).
+     6. downloadBtn 'click' -> Triggers either single-file download or multi-file ZIP download.
+
+  C. Function: async processFiles(files)
+     1. Filter input FileList into an array of valid images where file.type.startsWith('image/').
+     2. Validation: If the filtered array is empty, call alert('Please upload valid image files') and return immediately.
+     3. UI Transition to Processing State:
+        - Save original dropzone title text ("Click or drag images here").
+        - Update .drop-zone-title text to "Processing..." (or progress indicator).
+        - Hide #preview-container (style.display = 'none').
+        - Reset currentZip = null and singleImageData = null.
+     4. Single vs. Batch Branching:
+        - If validFiles.length === 1:
+            * Call const dataUrl = await processSingleFile(validFiles[0], null).
+            * Store singleImageData = { dataUrl: dataUrl, name: 'clean_' + validFiles[0].name }.
+            * Set preview.src = dataUrl and preview.style.display = 'block'.
+            * Set fileCountText.textContent = '1 image ready (Metadata stripped)'.
+            * Set downloadText.textContent = 'Download Clean Image'.
+        - If validFiles.length > 1:
+            * Instantiate currentZip = new JSZip().
+            * Map/iterate over validFiles and await processSingleFile(file, currentZip) for each file.
+            * Set preview.src to the first processed image's dataUrl (or display preview) and set fileCountText.textContent = validFiles.length + ' images ready (Metadata stripped)'.
+            * Set downloadText.textContent = 'Download All as ZIP (' + validFiles.length + ')'.
+     5. UI Transition to Ready State:
+        - Show #preview-container (style.display = 'flex').
+        - Restore .drop-zone-title text via resetUI(originalText).
+
+  D. Function: processSingleFile(file, zipInstance)
+     1. Return a new Promise((resolve, reject) => { ... }).
+     2. Instantiate const reader = new FileReader().
+     3. On reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const cleanDataUrl = canvas.toDataURL(file.type, 1.0);
+            if (zipInstance) {
+              const base64Data = cleanDataUrl.split(',')[1];
+              zipInstance.file('clean_' + file.name, base64Data, { base64: true });
+            }
+            resolve(cleanDataUrl);
+          };
+          img.onerror = reject;
+          img.src = event.target.result;
+        };
+     4. On reader.onerror = reject.
+     5. Call reader.readAsDataURL(file).
+
+  E. Download Button Handler (downloadBtn 'click'):
+     1. If currentZip is non-null (Multi-file mode):
+        - Update downloadText.textContent = 'Generating ZIP...'.
+        - Call const content = await currentZip.generateAsync({ type: 'blob' }).
+        - Create const url = URL.createObjectURL(content).
+        - Create temporary &lt;a&gt; element, set a.href = url, a.download = 'cleaned_images.zip', append to document.body, call a.click(), remove &lt;a&gt;, and call URL.revokeObjectURL(url).
+        - Restore downloadText.textContent.
+     2. Else if singleImageData is non-null (Single-file mode):
+        - Create temporary &lt;a&gt; element, set a.href = singleImageData.dataUrl, a.download = singleImageData.name, append to document.body, call a.click(), and remove &lt;a&gt;.
+
+  F. Function: resetUI(originalText)
+     - Restores .drop-zone-title textContent back to originalText ("Click or drag images here") and clears fileInput.value = '' so the same file can be selected again if needed.
+
+
+6. COMPLETE REFERENCE IMPLEMENTATION BLUEPRINT (SINGLE-FILE HTML/CSS/JS)
+--------------------------------------------------------------------------------
+An AI coding agent can directly write the following complete, self-contained index.html file to reproduce the observed behavior and visual design of [Remove AI Label](https://tahmidx.tech/ai-remove/) without analytics trackers:
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;title&gt;Remove AI Label&lt;/title&gt;
+  &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
+  &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin&gt;
+  &lt;link href=&quot;https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
+  &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js&quot;&gt;&lt;/script&gt;
+  &lt;style&gt;
+    :root {
+      --md-sys-color-background: #141218;
+      --md-sys-color-on-background: #E6E0E9;
+      --md-sys-color-surface: #1D1B20;
+      --md-sys-color-surface-container: #211F26;
+      --md-sys-color-surface-container-high: #2B2930;
+      --md-sys-color-surface-container-highest: #36343B;
+      --md-sys-color-primary: #D0BCFF;
+      --md-sys-color-on-primary: #381E72;
+      --md-sys-color-primary-container: #4F378B;
+      --md-sys-color-on-primary-container: #EADDFF;
+      --md-sys-color-secondary: #CCC2DC;
+      --md-sys-color-on-secondary: #332D41;
+      --md-sys-color-secondary-container: #4A4458;
+      --md-sys-color-on-secondary-container: #E8DEF8;
+      --md-sys-color-outline: #938F99;
+      --md-sys-color-outline-variant: #49454F;
+      --md-sys-shape-corner-medium: 16px;
+      --md-sys-shape-corner-extra-large: 28px;
+      --md-sys-shape-corner-full: 9999px;
+      --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+      --md-sys-motion-duration-medium: 400ms;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--md-sys-color-background);
+      color: var(--md-sys-color-on-background);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .m3-container {
+      width: 100%;
+      max-width: 540px;
+      text-align: center;
+    }
+
+    .m3-header {
+      margin-bottom: 32px;
+    }
+
+    .m3-header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin: 0 0 12px 0;
+      letter-spacing: -0.02em;
+    }
+
+    .m3-header h1 span {
+      background: linear-gradient(135deg, #D0BCFF, #FFD8E4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .m3-header p {
+      color: var(--md-sys-color-secondary);
+      font-size: 1.05rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .m3-card {
+      background-color: var(--md-sys-color-surface-container);
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-extra-large);
+      padding: 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--md-sys-color-outline);
+      border-radius: var(--md-sys-shape-corner-medium);
+      background-color: var(--md-sys-color-surface);
+      padding: 48px 24px;
+      cursor: pointer;
+      transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--md-sys-color-primary);
+      background-color: var(--md-sys-color-surface-container-high);
+      transform: scale(1.01);
+    }
+
+    .drop-zone-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--md-sys-color-on-background);
+    }
+
+    .drop-zone-subtitle {
+      font-size: 0.9rem;
+      color: var(--md-sys-color-outline);
+    }
+
+    #preview-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    #preview {
+      max-width: 100%;
+      max-height: 280px;
+      object-fit: contain;
+      border-radius: var(--md-sys-shape-corner-medium);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    #file-count-text {
+      font-size: 0.95rem;
+      color: var(--md-sys-color-secondary);
+    }
+
+    .m3-btn {
+      background-color: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border: none;
+      border-radius: var(--md-sys-shape-corner-full);
+      padding: 14px 28px;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: all 200ms ease;
+    }
+
+    .m3-btn:hover {
+      background-color: #EADDFF;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .m3-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 24px;
+    }
+
+    .m3-chip {
+      background-color: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .privacy-note {
+      margin-top: 24px;
+      font-size: 0.85rem;
+      color: var(--md-sys-color-outline);
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;main class=&quot;m3-container&quot;&gt;
+    &lt;header class=&quot;m3-header&quot;&gt;
+      &lt;h1&gt;Remove AI Label &lt;span&gt;Instantly&lt;/span&gt;&lt;/h1&gt;
+      &lt;p&gt;Strip C2PA, XMP, EXIF, and PNG metadata entirely within your browser.&lt;/p&gt;
+    &lt;/header&gt;
+
+    <section class="m3-card">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-zone-title">Click or drag images here</div>
+        <div class="drop-zone-subtitle">JPG, PNG, WebP · Multiple files allowed</div>
+        <input type="file" id="file-input" accept="image/jpeg, image/png, image/webp" multiple style="display: none;">
+      </div>
+
+      <div id="preview-container">
+        <img id="preview" alt="Image Preview">
+        <div id="file-count-text"></div>
+        <button id="download-btn" class="m3-btn">
+          <span id="download-text">Download Clean Image</span>
+        </button>
+      </div>
+
+      <div class="m3-chips">
+        <div class="m3-chip">✓ Strips C2PA</div>
+        <div class="m3-chip">✓ Strips XMP</div>
+        <div class="m3-chip">✓ Strips EXIF</div>
+        <div class="m3-chip">👁‍🗨 Bypasses IG/FB AI Label</div>
+      </div>
+    </section>
+
+    <div class="privacy-note">
+      🔒 100% Offline Processing. Your files never leave your device.
+    </div>
+  &lt;/main&gt;
+
+  &lt;script&gt;
+    const dropZone = document.getElementById(&#39;drop-zone&#39;);
+    const dropZoneTitle = dropZone.querySelector(&#39;.drop-zone-title&#39;);
+    const fileInput = document.getElementById(&#39;file-input&#39;);
+    const previewContainer = document.getElementById(&#39;preview-container&#39;);
+    const preview = document.getElementById(&#39;preview&#39;);
+    const fileCountText = document.getElementById(&#39;file-count-text&#39;);
+    const downloadBtn = document.getElementById(&#39;download-btn&#39;);
+    const downloadText = document.getElementById(&#39;download-text&#39;);
+
+    let currentZip = null;
+    let singleImageData = null;
+
+    dropZone.addEventListener(&#39;click&#39;, () =&gt; fileInput.click());
+
+    dropZone.addEventListener(&#39;dragover&#39;, (e) =&gt; {
+      e.preventDefault();
+      dropZone.classList.add(&#39;dragover&#39;);
+    });
+
+    dropZone.addEventListener(&#39;dragleave&#39;, () =&gt; {
+      dropZone.classList.remove(&#39;dragover&#39;);
+    });
+
+    dropZone.addEventListener(&#39;drop&#39;, (e) =&gt; {
+      e.preventDefault();
+      dropZone.classList.remove(&#39;dragover&#39;);
+      if (e.dataTransfer.files.length) {
+        processFiles(e.dataTransfer.files);
+      }
+    });
+
+    fileInput.addEventListener(&#39;change&#39;, (e) =&gt; {
+      if (e.target.files.length) {
+        processFiles(e.target.files);
+      }
+    });
+
+    async function processFiles(files) {
+      const validFiles = Array.from(files).filter(file =&gt; file.type.startsWith(&#39;image/&#39;));
+      if (validFiles.length === 0) {
+        alert(&#39;Please upload valid image files&#39;);
+        return;
+      }
+
+      const originalText = &#39;Click or drag images here&#39;;
+      dropZoneTitle.textContent = &#39;Processing...&#39;;
+      previewContainer.style.display = &#39;none&#39;;
+      currentZip = null;
+      singleImageData = null;
+
+      try {
+        if (validFiles.length === 1) {
+          const cleanDataUrl = await processSingleFile(validFiles[0], null);
+          singleImageData = {
+            dataUrl: cleanDataUrl,
+            name: &#39;clean_&#39; + validFiles[0].name
+          };
+          preview.src = cleanDataUrl;
+          fileCountText.textContent = &#39;1 image ready (Metadata stripped)&#39;;
+          downloadText.textContent = &#39;Download Clean Image&#39;;
+        } else {
+          currentZip = new JSZip();
+          let firstDataUrl = null;
+          for (let i = 0; i &lt; validFiles.length; i++) {
+            const cleanDataUrl = await processSingleFile(validFiles[i], currentZip);
+            if (i === 0) firstDataUrl = cleanDataUrl;
+          }
+          preview.src = firstDataUrl;
+          fileCountText.textContent = `${validFiles.length} images ready (Metadata stripped)`;
+          downloadText.textContent = `Download All as ZIP (${validFiles.length})`;
+        }
+
+        previewContainer.style.display = &#39;flex&#39;;
+      } catch (err) {
+        console.error(err);
+        alert(&#39;An error occurred while processing the images.&#39;);
+      } finally {
+        resetUI(originalText);
+      }
+    }
+
+    function processSingleFile(file, zipInstance) {
+      return new Promise((resolve, reject) =&gt; {
+        const reader = new FileReader();
+        reader.onload = (event) =&gt; {
+          const img = new Image();
+          img.onload = () =&gt; {
+            const canvas = document.createElement(&#39;canvas&#39;);
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext(&#39;2d&#39;);
+            ctx.drawImage(img, 0, 0);
+            const cleanDataUrl = canvas.toDataURL(file.type, 1.0);
+
+            if (zipInstance) {
+              const base64Data = cleanDataUrl.split(&#39;,&#39;)[1];
+              zipInstance.file(&#39;clean_&#39; + file.name, base64Data, { base64: true });
+            }
+            resolve(cleanDataUrl);
+          };
+          img.onerror = reject;
+          img.src = event.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function resetUI(originalText) {
+      dropZoneTitle.textContent = originalText;
+      fileInput.value = &#39;&#39;;
+    }
+
+    downloadBtn.addEventListener(&#39;click&#39;, async () =&gt; {
+      if (currentZip) {
+        const prevLabel = downloadText.textContent;
+        downloadText.textContent = &#39;Generating ZIP...&#39;;
+        const content = await currentZip.generateAsync({ type: &#39;blob&#39; });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement(&#39;a&#39;);
+        a.href = url;
+        a.download = &#39;cleaned_images.zip&#39;;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        downloadText.textContent = prevLabel;
+      } else if (singleImageData) {
+        const a = document.createElement(&#39;a&#39;);
+        a.href = singleImageData.dataUrl;
+        a.download = singleImageData.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    });
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+
+7. OPTIONAL PRODUCTION ENHANCEMENTS (DESIGN CHOICES VS. OBSERVED BEHAVIOR)
+--------------------------------------------------------------------------------
+In accordance with the Reverse Engineer Anything (REA) skill guidelines, the following optional improvements are explicitly separated from the observed target behavior on [Remove AI Label](https://tahmidx.tech/ai-remove/):
+
+  - Memory Efficiency for Large Batches (Design Choice):
+    * Observed Behavior: Uses canvas.toDataURL(file.type, 1.0), which allocates Base64 strings in memory.
+    * Optional Enhancement: Replace canvas.toDataURL with canvas.toBlob((blob) => ..., file.type, 1.0) and pass the binary Blob directly to zipInstance.file('clean_' + file.name, blob) to reduce peak browser memory usage by ~33% on large high-resolution batches.
+  - Filename Collision Guard in Batch ZIPs (Design Choice):
+    * Observed Behavior: Writes 'clean_' + file.name directly into JSZip, which overwrites entries if two dropped files share the same filename.
+    * Optional Enhancement: Append a numeric suffix (e.g., clean_image_1.png) if zipInstance.file('clean_' + file.name) already exists.
+================================================================================
